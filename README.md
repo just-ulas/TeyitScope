@@ -1,51 +1,60 @@
 # TeyitScope
 
-Açık kaynak, modüler görsel adli analiz ve teyit araç seti. **0BSD** lisanslıdır.
+Kayıt istemeyen kullanım için tasarlanmış, tamamen açık kaynaklı ve **0BSD lisanslı** görsel adli analiz platformu. Kullanıcı hesabı, veritabanı veya kalıcı görsel depolama gerektirmez.
 
-> TeyitScope sonuçları karar destek sinyalidir; tek başına bir görselin sahte veya gerçek olduğunu kanıtlamaz. İnsan incelemesi ve kaynak doğrulaması gerekir.
+> Sonuçlar karar destek sinyalidir; tek başına bir görselin sahte veya gerçek olduğunu kanıtlamaz. İnsan incelemesi ve kaynak doğrulaması gerekir.
 
-## Özellikler
+## V2 büyük güncellemesi
 
-- **Piksel ve derinlik analizi:** JPEG ELA ısı haritası, metadata/EXIF dökümü ve eksik metadata uyarısı, gürültü analizi için başlangıç katmanı.
-- **AI/deepfake katmanı:** Model adaptörü için `HeuristicAIAnalyzer` arayüzü; yüz swap, ışık/gölge ve AI üretim modelleri eklenti olarak bağlanabilir.
-- **Açık entegrasyon:** CLI ve isteğe bağlı FastAPI REST API (`POST /v1/analyze`, `GET /health`).
-- **Custom dataset:** Model ağırlıkları ve eğitim pipeline'ı için ayrılmış API yüzeyi; proje içine veri veya model yüklenmez.
-- **Plugin mimarisi:** `Analyzer` protokolünü uygulayan sınıflar `PluginRegistry` ile kaydedilebilir.
-- **Anlaşılır rapor:** 0–100 manipülasyon şüphesi skoru, bulgular, sınırlılıklar ve ELA heatmap çıktısı.
+- **No-login web UI:** `GET /` tarayıcı arayüzü; görsel yükleyip raporu anında görme.
+- **Forensic katman:** JPEG ELA ısı haritası, EXIF/metadata dökümü ve silinmiş metadata uyarısı, gürültü proxy'si.
+- **Işık/gölge triage:** 4×4 luminance yayılımı ile açıklanabilir ön sinyal.
+- **Yüz/deepfake adapter yüzeyi:** Güvenli model eklentileri için `FaceManipulationAnalyzer` ve AI analyzer kancaları.
+- **Eğitilebilir baseline:** JSONL manifestten ELA/gürültü özellikleriyle Random Forest; scikit-learn yoksa yerleşik nearest-centroid fallback.
+- **REST API & CLI:** `POST /v1/analyze`, `GET /health`, `teyitscope analyze` ve `teyitscope train`.
+- **CI ve mahremiyet:** GitHub Actions testi, SECURITY.md ve görsellerin varsayılan olarak kalıcı tutulmaması.
 
-## Kurulum
+## Kurulum ve çalıştırma
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,api]"
+pip install -e ".[dev,api,ml]"
+uvicorn teyitscope.api:app --host 0.0.0.0 --port 8000
 ```
+
+Tarayıcıdan `http://localhost:8000` adresini açın. Kullanıcı kaydı yoktur.
 
 ## CLI
 
 ```bash
 teyitscope analyze foto.jpg --output ./rapor
-# veya: python -m teyitscope.cli analyze foto.jpg
 ```
 
-## API
+## Custom dataset ile eğitim
+
+Veri setini repoya göndermek zorunda değilsiniz. `data/README.md` biçimindeki JSONL manifesti hazırlayın:
+
+```json
+{"path":"images/real/001.jpg","label":0}
+{"path":"images/manipulated/001.jpg","label":1}
+```
+
+Sonra:
 
 ```bash
-uvicorn teyitscope.api:app --reload
-curl -X POST http://localhost:8000/v1/analyze -F "upload=@foto.jpg"
+teyitscope train manifest.jsonl --output models/baseline.pkl
 ```
 
-## Yol haritası
+Bu ilk model açıklanabilir bir baseline'dır; gerçek üretim sistemi için ayrı train/test bölümü, veri lisansları, rıza, kalibrasyon, benchmark ve insan değerlendirmesi şarttır. Proje kasıtlı olarak modelin hazır olmadığı yerlerde `not_configured` döndürür; sahte kesinlik üretmez.
 
-1. Yerel bölge bazlı noise/ELA heatmap ve görsel raporlayıcı.
-2. Model adapter'ları: AI-generated classifier, yüz manipülasyonu ve ışık-gölge tutarlılığı.
-3. Dataset manifest standardı, eğitim/evaluasyon komutları ve kalibrasyonlu güven skorları.
-4. Plugin keşfi, sandbox politikası, Telegram/Discord örnek botları.
-5. Benchmark veri setleri, yanlış-pozitif raporlaması ve tekrarlanabilir değerlendirme.
+## Plugin yaklaşımı
 
-## Geliştirme
+Bir eklenti `Analyzer` protokolündeki `name` ve `analyze(image)` üyelerini uygular. Yüz swap, AI üretim sınıflandırması, optik akış veya fizik tabanlı ışık çözümü bu kancaya bağlanabilir. Eklentiler güvenilmeyen dosyaları çalıştırmamalı; üretim kullanımında sandbox ve kaynak sınırı uygulanmalıdır.
 
-```bash
-pytest -q
-```
+## Platform notu
 
-Katkılar memnuniyetle karşılanır. Hassas görselleri izinsiz yüklemeyin; API kullanımında saklama ve erişim politikalarını ayrıca uygulayın.
+Public depoları ziyaretçiler genellikle hesapsız görüntüleyebilir; ancak güvenilir forge'lar spam ve kötüye kullanım nedeniyle anonim hesap/repo oluşturmayı desteklemez. Bu nedenle v2'nin asıl kullanıcı deneyimi **kayıtsız web arayüzüdür**. Projeyi Codeberg, SourceHut veya kendi Forgejo sunucunuza taşımak için ilgili hesap/anahtar gerekir; kullanıcı adına sahte veya geçici e-posta hesabı oluşturulmamıştır.
+
+## Lisans ve geliştirme
+
+0BSD. Test: `pytest -q`. Güvenlik ve görsel mahremiyeti için [SECURITY.md](SECURITY.md) dosyasına bakın.
