@@ -1,0 +1,60 @@
+{
+  "source": "test-assets/reference/target-store-manipulated.jpg",
+  "width": 2048,
+  "height": 1536,
+  "metadata": {},
+  "findings": [
+    {
+      "name": "metadata",
+      "fields": {},
+      "metadata_missing_or_stripped": true,
+      "warning": "Metadata silinmiş/manipüle edilmiş olabilir",
+      "editing_software": null
+    },
+    {
+      "name": "ela",
+      "mean_error": 0.4178,
+      "heatmap_path": "test-results/repeat-v4/fake-4/target-store-manipulated-ela-heatmap.png"
+    },
+    {
+      "name": "local_splice",
+      "tile_median_error": 1.512,
+      "tile_p95_error": 2.8757,
+      "outlier_ratio": 1.9019,
+      "note": "Bölgesel ELA dışlık sinyali; tek başına kanıt değildir."
+    },
+    {
+      "name": "seam_boundary",
+      "internal_vertical_p99": 17.0055,
+      "internal_horizontal_p99": 24.566,
+      "note": "Uzun iç sınır sinyali; doğal mimari çizgiler yanlış pozitif üretebilir."
+    },
+    {
+      "name": "noise",
+      "global_noise_proxy": 61.1666,
+      "note": "Yerel gürültü haritası için gelişmiş model eklentisi kullanılabilir."
+    },
+    {
+      "name": "light_shadow",
+      "quadrant_luminance_spread": 43.9095,
+      "note": "Gelişmiş ışık/gölge fizik modeli eklenti olarak bağlanabilir."
+    },
+    {
+      "name": "face_manipulation",
+      "status": "not_configured",
+      "faces": null,
+      "note": "Yüz tespiti/swap modeli güvenli bir model eklentisiyle etkinleştirilebilir."
+    },
+    {
+      "name": "ai_generated",
+      "status": "not_configured",
+      "probability": null,
+      "note": "Model ağırlığı yüklenmedi; custom dataset/model eklentisi bağlayın."
+    }
+  ],
+  "manipulation_score": 50.06,
+  "limitations": [
+    "Bu skor karar destek sinyalidir; tek başına görselin sahte olduğunu kanıtlamaz.",
+    "AI/deepfake ve yüz modeli varsayılan olarak etkin değildir."
+  ]
+}
