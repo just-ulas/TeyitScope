@@ -1,0 +1,14 @@
+LICENSE
+README.md
+pyproject.toml
+tests/test_analysis.py
+teyitscope/__init__.py
+teyitscope/analysis.py
+teyitscope/api.py
+teyitscope/cli.py
+teyitscope.egg-info/PKG-INFO
+teyitscope.egg-info/SOURCES.txt
+teyitscope.egg-info/dependency_links.txt
+teyitscope.egg-info/entry_points.txt
+teyitscope.egg-info/requires.txt
+teyitscope.egg-info/top_level.txt

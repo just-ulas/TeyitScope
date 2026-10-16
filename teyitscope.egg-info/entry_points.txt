@@ -1,0 +1,2 @@
+[console_scripts]
+teyitscope = teyitscope.cli:app
