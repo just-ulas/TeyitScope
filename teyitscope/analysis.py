@@ -60,6 +60,27 @@ class NoiseAnalyzer:
         return {"name": self.name, "global_noise_proxy": round(math.sqrt(variance), 4),
                 "note": "Yerel gürültü haritası için gelişmiş model eklentisi kullanılabilir."}
 
+class LightShadowAnalyzer:
+    name = "light_shadow"
+    def analyze(self, image):
+        # A transparent baseline: compares luminance gradients in quadrants.
+        # It is a triage signal, not a physical-light solver.
+        gray = image.convert("L").resize((64, 64))
+        q = []
+        for y in range(4):
+            for x in range(4):
+                crop = gray.crop((x*16, y*16, (x+1)*16, (y+1)*16))
+                q.append(ImageStat.Stat(crop).mean[0])
+        spread = statistics.pstdev(q)
+        return {"name": self.name, "quadrant_luminance_spread": round(spread, 4),
+                "note": "Gelişmiş ışık/gölge fizik modeli eklenti olarak bağlanabilir."}
+
+class FaceManipulationAnalyzer:
+    name = "face_manipulation"
+    def analyze(self, image):
+        return {"name": self.name, "status": "not_configured", "faces": None,
+                "note": "Yüz tespiti/swap modeli güvenli bir model eklentisiyle etkinleştirilebilir."}
+
 class HeuristicAIAnalyzer:
     name = "ai_generated"
     def analyze(self, image):
@@ -73,7 +94,7 @@ class PluginRegistry:
 
 def analyze_file(path: str | Path, output_dir: str | Path | None = None) -> AnalysisReport:
     path = Path(path); image = Image.open(path)
-    analyzers = [MetadataAnalyzer(), ELAAnalyzer(), NoiseAnalyzer(), HeuristicAIAnalyzer()]
+    analyzers = [MetadataAnalyzer(), ELAAnalyzer(), NoiseAnalyzer(), LightShadowAnalyzer(), FaceManipulationAnalyzer(), HeuristicAIAnalyzer()]
     findings = []
     signals = []
     for analyzer in analyzers:
@@ -88,4 +109,4 @@ def analyze_file(path: str | Path, output_dir: str | Path | None = None) -> Anal
     score = round(min(100.0, (sum(signals) / max(1, len(signals))) * 100), 2)
     return AnalysisReport(str(path), image.width, image.height, findings[0]["fields"], findings, score,
         ["Bu skor karar destek sinyalidir; tek başına görselin sahte olduğunu kanıtlamaz.",
-         "AI/deepfake modeli varsayılan olarak etkin değildir."])
+         "AI/deepfake ve yüz modeli varsayılan olarak etkin değildir."])
