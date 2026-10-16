@@ -71,10 +71,26 @@ class LocalSpliceAnalyzer:
         ratio=p95/(median+1e-6)
         # High relative tile contrast is a triage signal; broad natural edges
         # are less suspicious than a concentrated outlier.
-        signal=max(0.0,min(1.0,(ratio-1.15)/3.0))
+        signal=max(0.0,min(1.0,(ratio-2.15)/1.5))
         return {"name": self.name, "tile_median_error": round(median,4),
                 "tile_p95_error": round(p95,4), "outlier_ratio": round(ratio,4),
                 "signal": signal, "note":"Bölgesel ELA dışlık sinyali; tek başına kanıt değildir."}
+
+class SeamAnalyzer:
+    name = "seam_boundary"
+    def analyze(self, image):
+        # Detects unusually strong, long internal row/column discontinuities.
+        # This catches obvious pasted rectangles while remaining conservative.
+        import numpy as np
+        arr=np.asarray(image.convert("L").resize((256,192)),dtype=float)
+        gx=np.abs(np.diff(arr,axis=1)).mean(axis=0)[10:-10]
+        gy=np.abs(np.diff(arr,axis=0)).mean(axis=1)[10:-10]
+        x99=float(np.percentile(gx,99)); y99=float(np.percentile(gy,99))
+        # Calibrated conservatively against ordinary architectural edges.
+        signal=max(0.0,min(1.0,max((x99-12.0)/10.0,(y99-26.0)/12.0)))
+        return {"name": self.name, "internal_vertical_p99": round(x99,4),
+                "internal_horizontal_p99": round(y99,4), "signal": signal,
+                "note":"Uzun iç sınır sinyali; doğal mimari çizgiler yanlış pozitif üretebilir."}
 
 class NoiseAnalyzer:
     name = "noise"
@@ -119,7 +135,7 @@ class PluginRegistry:
 
 def analyze_file(path: str | Path, output_dir: str | Path | None = None) -> AnalysisReport:
     path = Path(path); image = Image.open(path)
-    analyzers = [MetadataAnalyzer(), ELAAnalyzer(), LocalSpliceAnalyzer(), NoiseAnalyzer(), LightShadowAnalyzer(), FaceManipulationAnalyzer(), HeuristicAIAnalyzer()]
+    analyzers = [MetadataAnalyzer(), ELAAnalyzer(), LocalSpliceAnalyzer(), SeamAnalyzer(), NoiseAnalyzer(), LightShadowAnalyzer(), FaceManipulationAnalyzer(), HeuristicAIAnalyzer()]
     findings = []
     signals = []
     for analyzer in analyzers:
