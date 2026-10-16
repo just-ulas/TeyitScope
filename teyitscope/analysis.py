@@ -18,6 +18,9 @@ class AnalysisReport:
     findings: list[dict[str, Any]]
     manipulation_score: float
     limitations: list[str]
+    fusion: dict[str,Any] | None = None
+    provenance: dict[str,Any] | None = None
+    camera_profile: dict[str,Any] | None = None
     def to_dict(self): return asdict(self)
 
 class MetadataAnalyzer:
@@ -140,14 +143,21 @@ def analyze_file(path: str | Path, output_dir: str | Path | None = None) -> Anal
     signals = []
     for analyzer in analyzers:
         result = analyzer.analyze(image)
-        signals.append(float(result.pop("signal", 0)))
+        signal=float(result.get("signal", 0)); signals.append(signal); result["signal"]=round(signal,4)
         if "heatmap" in result:
             if output_dir:
                 out = Path(output_dir); out.mkdir(parents=True, exist_ok=True)
                 heat_path = out / f"{path.stem}-ela-heatmap.png"; result["heatmap_path"] = str(heat_path); result["heatmap"].save(heat_path)
             result.pop("heatmap", None)
         findings.append(result)
-    score = round(min(100.0, max(signals) * 100), 2)
+    from .fusion import fuse_findings
+    from .profiles import infer_profile
+    from .provenance import fingerprint, source_lookup_plan
+    fusion=fuse_findings(findings)
+    score=round(float(fusion["score"]),2)
+    profile=infer_profile(findings[0]["fields"])
+    prov=fingerprint(path); prov["osint_plan"]=source_lookup_plan(prov["sha256"])
     return AnalysisReport(str(path), image.width, image.height, findings[0]["fields"], findings, score,
-        ["Bu skor karar destek sinyalidir; tek başına görselin sahte olduğunu kanıtlamaz.",
-         "AI/deepfake ve yüz modeli varsayılan olarak etkin değildir."])
+        ["Skor karar destek sinyalidir; tek başına görselin sahte olduğunu kanıtlamaz.",
+         "AI/deepfake ve yüz modeli varsayılan olarak etkin değildir.",
+         "OSINT sağlayıcıları gizlilik ve kimlik bilgileri nedeniyle otomatik sorgulanmadı."], fusion, prov, profile)

@@ -1,0 +1,9 @@
+{
+  "datasets": {
+    "real_world": "manifests/real_world.jsonl",
+    "synthetic_ai": "manifests/synthetic_ai.jsonl",
+    "edited_news": "manifests/edited_news.jsonl"
+  },
+  "protocol": "leave_one_dataset_out",
+  "labels": {"0":"real", "1":"manipulated"}
+}
