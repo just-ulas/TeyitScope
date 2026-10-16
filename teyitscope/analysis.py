@@ -51,6 +51,31 @@ class ELAAnalyzer:
         return {"name": self.name, "mean_error": round(mean, 4),
                 "heatmap": heatmap, "signal": min(1.0, mean / 32)}
 
+class LocalSpliceAnalyzer:
+    name = "local_splice"
+    def analyze(self, image):
+        # Tile-level ELA: spliced regions often retain a different recompression
+        # footprint than the surrounding image. We report robust relative stats.
+        import io
+        base = image.convert("RGB").resize((min(1024, image.width), min(1024, image.height)))
+        buf = io.BytesIO(); base.save(buf, "JPEG", quality=90); buf.seek(0)
+        recompressed = Image.open(buf).convert("RGB")
+        diff = ImageChops.difference(base, recompressed)
+        w,h=base.size; cols=8; rows=8; vals=[]
+        for y in range(rows):
+            for x in range(cols):
+                tile=diff.crop((x*w//cols,y*h//rows,(x+1)*w//cols,(y+1)*h//rows))
+                vals.append(sum(ImageStat.Stat(tile).mean)/3)
+        ordered=sorted(vals); median=statistics.median(ordered)
+        p95=ordered[max(0,int(len(ordered)*.95)-1)]
+        ratio=p95/(median+1e-6)
+        # High relative tile contrast is a triage signal; broad natural edges
+        # are less suspicious than a concentrated outlier.
+        signal=max(0.0,min(1.0,(ratio-1.15)/3.0))
+        return {"name": self.name, "tile_median_error": round(median,4),
+                "tile_p95_error": round(p95,4), "outlier_ratio": round(ratio,4),
+                "signal": signal, "note":"Bölgesel ELA dışlık sinyali; tek başına kanıt değildir."}
+
 class NoiseAnalyzer:
     name = "noise"
     def analyze(self, image):
@@ -94,7 +119,7 @@ class PluginRegistry:
 
 def analyze_file(path: str | Path, output_dir: str | Path | None = None) -> AnalysisReport:
     path = Path(path); image = Image.open(path)
-    analyzers = [MetadataAnalyzer(), ELAAnalyzer(), NoiseAnalyzer(), LightShadowAnalyzer(), FaceManipulationAnalyzer(), HeuristicAIAnalyzer()]
+    analyzers = [MetadataAnalyzer(), ELAAnalyzer(), LocalSpliceAnalyzer(), NoiseAnalyzer(), LightShadowAnalyzer(), FaceManipulationAnalyzer(), HeuristicAIAnalyzer()]
     findings = []
     signals = []
     for analyzer in analyzers:
@@ -106,7 +131,7 @@ def analyze_file(path: str | Path, output_dir: str | Path | None = None) -> Anal
                 heat_path = out / f"{path.stem}-ela-heatmap.png"; result["heatmap_path"] = str(heat_path); result["heatmap"].save(heat_path)
             result.pop("heatmap", None)
         findings.append(result)
-    score = round(min(100.0, (sum(signals) / max(1, len(signals))) * 100), 2)
+    score = round(min(100.0, max(signals) * 100), 2)
     return AnalysisReport(str(path), image.width, image.height, findings[0]["fields"], findings, score,
         ["Bu skor karar destek sinyalidir; tek başına görselin sahte olduğunu kanıtlamaz.",
          "AI/deepfake ve yüz modeli varsayılan olarak etkin değildir."])
