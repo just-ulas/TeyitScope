@@ -1,20 +1,21 @@
 # TeyitScope
 
-Kayıt istemeyen kullanım için tasarlanmış, tamamen açık kaynaklı ve **0BSD lisanslı** görsel adli analiz platformu. Kullanıcı hesabı, veritabanı veya kalıcı görsel depolama gerektirmez.
+Kayıt istemeyen, tamamen açık kaynaklı ve **0BSD** lisanslı görsel adli inceleme aracı. Arayüz özellikle süssüzdür: koyu teknik panel, net tipografi ve ham kanıt raporu.
 
-> Sonuçlar karar destek sinyalidir; tek başına bir görselin sahte veya gerçek olduğunu kanıtlamaz. İnsan incelemesi ve kaynak doğrulaması gerekir.
+> Skor karar destek sinyalidir. Hiçbir otomatik yöntem tek başına görselin gerçekliğini kanıtlamaz.
 
-## V2 büyük güncellemesi
+## V0.3 mimari güncellemesi
 
-- **No-login web UI:** `GET /` tarayıcı arayüzü; görsel yükleyip raporu anında görme.
-- **Forensic katman:** JPEG ELA ısı haritası, EXIF/metadata dökümü ve silinmiş metadata uyarısı, gürültü proxy'si.
-- **Işık/gölge triage:** 4×4 luminance yayılımı ile açıklanabilir ön sinyal.
-- **Yüz/deepfake adapter yüzeyi:** Güvenli model eklentileri için `FaceManipulationAnalyzer` ve AI analyzer kancaları.
-- **Eğitilebilir baseline:** JSONL manifestten ELA/gürültü özellikleriyle Random Forest; scikit-learn yoksa yerleşik nearest-centroid fallback.
-- **REST API & CLI:** `POST /v1/analyze`, `GET /health`, `teyitscope analyze` ve `teyitscope train`.
-- **CI ve mahremiyet:** GitHub Actions testi, SECURITY.md ve görsellerin varsayılan olarak kalıcı tutulmaması.
+- **Cross-dataset eğitim sözleşmesi:** Kaynaklar arası train/test ayrımı ve leave-one-dataset-out manifest protokolü. Veri setleri lisans ve izinleriyle dışarıda tutulur.
+- **Model fusion:** ELA, bölgesel splice, seam, noise, ışık/gölge ve gelecekte bağlanacak AI/yüz modelleri ağırlıklı olarak birleştirilir. `not_configured` modeller skoru yapay biçimde düşürmez. Kanıtlar ayrıştığında `confidence` azalır.
+- **AI/deepfake adapter sistemi:** `teyitscope.models.ModelAdapter` ile Stable Diffusion, Midjourney, DALL-E, yüz-swap ve diğer doğrulanmış modeller bağlanabilir. Ağırlık yokken sistem kesinlik uydurmaz.
+- **Provenance:** SHA-256, average hash, boyut ve format parmak izi rapora eklenir.
+- **OSINT planı:** Google Lens, Bing Visual Search ve TinEye için açık sağlayıcı kancaları var; özel görseller API anahtarı veya açık izin olmadan otomatik yüklenmez.
+- **Kamera profilleri:** iPhone 13 Pro ve generic JPEG profilleri priors olarak bulunur; metadata yokluğu kamera kanıtı sayılmaz.
+- **Geri bildirim döngüsü:** `/v1/feedback` verileri karantina JSONL’sine yazar. İnsan incelemesi ve lisans kontrolü olmadan modele katılmaz.
+- **Minimal panel:** Kart, neon, renkli alarm kutusu veya grafik dashboard yok; düz siyah zemin ve teknik rapor.
 
-## Kurulum ve çalıştırma
+## Çalıştırma
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -22,39 +23,42 @@ pip install -e ".[dev,api,ml]"
 uvicorn teyitscope.api:app --host 0.0.0.0 --port 8000
 ```
 
-Tarayıcıdan `http://localhost:8000` adresini açın. Kullanıcı kaydı yoktur.
+Tarayıcıda `http://localhost:8000` adresini açın. Kullanıcı kaydı yoktur.
 
-## CLI
+## API
 
 ```bash
-teyitscope analyze foto.jpg --output ./rapor
+curl http://localhost:8000/health
+curl -X POST http://localhost:8000/v1/analyze -F "upload=@foto.jpg"
+curl -X POST http://localhost:8000/v1/feedback \
+  -H 'Content-Type: application/json' \
+  -d '{"report_id":"sha256-or-case-id","label":"uncertain","notes":"İnsan incelemesi bekliyor"}'
 ```
 
-## Custom dataset ile eğitim
+## Eğitim
 
-Veri setini repoya göndermek zorunda değilsiniz. `data/README.md` biçimindeki JSONL manifesti hazırlayın:
-
-```json
-{"path":"images/real/001.jpg","label":0}
-{"path":"images/manipulated/001.jpg","label":1}
-```
-
-Sonra:
+Tek dataset baseline:
 
 ```bash
 teyitscope train manifest.jsonl --output models/baseline.pkl
 ```
 
-Bu ilk model açıklanabilir bir baseline'dır; gerçek üretim sistemi için ayrı train/test bölümü, veri lisansları, rıza, kalibrasyon, benchmark ve insan değerlendirmesi şarttır. Proje kasıtlı olarak modelin hazır olmadığı yerlerde `not_configured` döndürür; sahte kesinlik üretmez.
+Çapraz dataset manifest doğrulaması:
 
-## Plugin yaklaşımı
+```bash
+teyitscope cross-dataset data/cross-dataset.json
+```
 
-Bir eklenti `Analyzer` protokolündeki `name` ve `analyze(image)` üyelerini uygular. Yüz swap, AI üretim sınıflandırması, optik akış veya fizik tabanlı ışık çözümü bu kancaya bağlanabilir. Eklentiler güvenilmeyen dosyaları çalıştırmamalı; üretim kullanımında sandbox ve kaynak sınırı uygulanmalıdır.
+`data/README.md` ve `data/cross-dataset.json.example` gerçek verinin nasıl kaydedileceğini anlatır. Bu depo büyük lisanslı veri setlerini veya model ağırlıklarını izinsiz içermez. Gerçek AI/deepfake eğitimi için veri lisansı, kaynak dengesi, kamera/codec çeşitliliği, üretici çeşitliliği ve dış test seti gereklidir.
 
-## Platform notu
+## Test
 
-Public depoları ziyaretçiler genellikle hesapsız görüntüleyebilir; ancak güvenilir forge'lar spam ve kötüye kullanım nedeniyle anonim hesap/repo oluşturmayı desteklemez. Bu nedenle v2'nin asıl kullanıcı deneyimi **kayıtsız web arayüzüdür**. Projeyi Codeberg, SourceHut veya kendi Forgejo sunucunuza taşımak için ilgili hesap/anahtar gerekir; kullanıcı adına sahte veya geçici e-posta hesabı oluşturulmamıştır.
+```bash
+pytest -q
+```
 
-## Lisans ve geliştirme
+Kontrollü testte Wikimedia referans fotoğrafı v4/v5 motorunda düşük, bilerek nesne eklenmiş sürüm yüksek sinyal üretmiştir. Bu, yalnızca belirgin splice senaryosu için regresyon kanıtıdır; profesyonel retouch ve tüm üretici modelleri için doğruluk garantisi değildir.
 
-0BSD. Test: `pytest -q`. Güvenlik ve görsel mahremiyeti için [SECURITY.md](SECURITY.md) dosyasına bakın.
+## Gizlilik ve lisans
+
+Görseller varsayılan olarak kalıcı tutulmaz. OSINT sağlayıcılarına otomatik görsel gönderilmez. Üretim kurulumunda dosya boyutu, MIME doğrulaması, rate limit, geçici dosya temizliği ve erişim politikaları ekleyin. Lisans: **0BSD**.
